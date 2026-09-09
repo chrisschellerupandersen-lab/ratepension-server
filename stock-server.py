@@ -56,39 +56,33 @@ cache = {
 }
 
 def get_stock_data(ticker):
-    """Henter data for en enkelt aktie"""
+    """Henter data fra Finnhub API (gratis, stabil)"""
     try:
-        stock = yf.Ticker(ticker)
-        # Brug fast_info som fallback (mere robust)
-        try:
-            info = stock.fast_info
-            current_price = info.get("currentPrice", 0) or info.get("lastPrice", 0)
-        except:
-            info = stock.info
-            current_price = info.get("currentPrice", 0) or info.get("regularMarketPrice", 0)
+        # Finnhub gratis API - ingen key påkrævet for quote endpoint
+        url = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token=c91ad919e0ad89e2af097f3cf44c38306a0d4c71"
 
-        # Hent historisk data for år-performance
-        hist = stock.history(period="1y")
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
 
-        if len(hist) > 0:
-            year_ago_price = hist.iloc[0]["Close"]
-            year_change = ((current_price - year_ago_price) / year_ago_price * 100) if year_ago_price > 0 else 0
-        else:
-            year_change = 0
+        current_price = data.get("c", 0)  # current price
+        change_pct = data.get("d", 0)    # change in dollars
+        change_pct_day = data.get("dp", 0)  # change percent
 
         return {
             "ticker": ticker,
             "price": round(current_price, 2) if current_price else 0,
             "currency": "USD",
-            "change_day": round(info.get("regularMarketChangePercent", 0), 2) if info else 0,
-            "change_year": round(year_change, 2),
-            "market_cap": info.get("marketCap", 0) if info else 0,
-            "pe_ratio": info.get("trailingPE", 0) if info else 0,
+            "change_day": round(change_pct_day, 2) if change_pct_day else 0,
+            "change_year": 0.0,
+            "market_cap": 0,
+            "pe_ratio": 0,
             "dividend_yield": 0,
+            "source": "Finnhub"
         }
     except Exception as e:
-        print(f"Error fetching {ticker}: {str(e)}")
-        # Fallback: mock data så dashboardet ikke er helt tomt
+        print(f"Error fetching {ticker} from Finnhub: {str(e)}")
+        # Fallback: mock data
         mock_prices = {
             "MSFT": 418.65, "TSLA": 252.45, "NVDA": 128.95, "GOOGL": 178.50,
             "NVO": 83.45, "KO": 74.30, "SBUX": 102.15, "META": 561.75,
@@ -108,7 +102,7 @@ def get_stock_data(ticker):
             "market_cap": 0,
             "pe_ratio": 0,
             "dividend_yield": 0,
-            "note": "Mock data - yfinance fejl"
+            "source": "Mock (fallback)"
         }
 
 def update_cache():
