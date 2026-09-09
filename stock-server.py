@@ -59,40 +59,48 @@ def get_stock_data(ticker):
     """Henter live data fra free API sources"""
 
     # Live market prices (last updated manually)
-    # These are current as of deployment
+    # DKK = Danish krone (Nasdaq OMX Copenhagen)
+    # USD = US Dollar (Nasdaq, NYSE, etc.)
     live_prices = {
-        "MSFT": {"price": 427.15, "change": 0.65},
-        "TSLA": {"price": 368.16, "change": -1.25},
-        "NVDA": {"price": 143.48, "change": 2.15},
-        "GOOGL": {"price": 187.35, "change": 0.45},
-        "NVO": {"price": 89.22, "change": -0.85},
-        "KO": {"price": 76.42, "change": 0.25},
-        "SBUX": {"price": 106.78, "change": 1.05},
-        "META": {"price": 588.45, "change": 2.35},
-        "AAPL": {"price": 242.88, "change": 0.95},
-        "COIN": {"price": 203.65, "change": 3.25},
-        "V": {"price": 301.25, "change": 0.55},
-        "O": {"price": 65.35, "change": -0.15},
-        "SAAB-B.ST": {"price": 152.45, "change": 1.35},
-        "KTOS": {"price": 31.85, "change": 2.45},
-        "SG": {"price": 192.15, "change": 0.75},
-        "SPOT": {"price": 312.55, "change": 1.85},
-        "SOUN": {"price": 7.25, "change": -2.15},
-        "SOFI": {"price": 30.45, "change": 1.55},
-        "CYBN": {"price": 6.35, "change": -1.25},
-        "EUNL.DE": {"price": 982.30, "change": 0.85},
-        "BULL.NOVO.X3": {"price": 95.50, "change": -3.15},
-        "BULL.NFLX.X2": {"price": 92.75, "change": -4.85},
+        # US stocks (USD)
+        "MSFT": {"price": 427.15, "change": 0.65, "currency": "USD"},
+        "TSLA": {"price": 368.16, "change": -1.25, "currency": "USD"},
+        "NVDA": {"price": 143.48, "change": 2.15, "currency": "USD"},
+        "GOOGL": {"price": 187.35, "change": 0.45, "currency": "USD"},
+        "KO": {"price": 76.42, "change": 0.25, "currency": "USD"},
+        "SBUX": {"price": 106.78, "change": 1.05, "currency": "USD"},
+        "META": {"price": 588.45, "change": 2.35, "currency": "USD"},
+        "AAPL": {"price": 242.88, "change": 0.95, "currency": "USD"},
+        "COIN": {"price": 203.65, "change": 3.25, "currency": "USD"},
+        "V": {"price": 301.25, "change": 0.55, "currency": "USD"},
+        "O": {"price": 65.35, "change": -0.15, "currency": "USD"},
+        "SAAB-B.ST": {"price": 152.45, "change": 1.35, "currency": "USD"},
+        "KTOS": {"price": 31.85, "change": 2.45, "currency": "USD"},
+        "SG": {"price": 192.15, "change": 0.75, "currency": "USD"},
+        "SPOT": {"price": 312.55, "change": 1.85, "currency": "USD"},
+        "SOUN": {"price": 7.25, "change": -2.15, "currency": "USD"},
+        "SOFI": {"price": 30.45, "change": 1.55, "currency": "USD"},
+        "CYBN": {"price": 6.35, "change": -1.25, "currency": "USD"},
+        "EUNL.DE": {"price": 982.30, "change": 0.85, "currency": "USD"},
+
+        # Danish stocks (DKK) - Nasdaq OMX Copenhagen
+        "NVO": {"price": 288.9, "change": -0.85, "currency": "DKK"},
+
+        # Danish derivatives (DKK) - Nasdaq OMX Copenhagen
+        "BULL.NOVO.X3": {"price": 28.96, "change": -3.15, "currency": "DKK"},
+        "BULL.NFLX.X2": {"price": 47.0, "change": -4.85, "currency": "DKK"},
     }
 
     try:
         if ticker in live_prices:
             data = live_prices[ticker]
-            print(f"[SUCCESS] Got LIVE data for {ticker}: ${data['price']}")
+            currency = data.get("currency", "USD")
+            symbol = "kr" if currency == "DKK" else "$"
+            print(f"[SUCCESS] Got LIVE data for {ticker}: {symbol}{data['price']} ({currency})")
             return {
                 "ticker": ticker,
                 "price": data["price"],
-                "currency": "USD",
+                "currency": currency,
                 "change_day": data["change"],
                 "change_year": 0.0,
                 "market_cap": 0,
@@ -393,14 +401,26 @@ def dashboard():
       const rows = data.portfolio.map(stock => {{
         const price = stock.price || 0;
         const shares = stock.shares || 0;
-        const valueDKK = price * shares * USDK_RATE;
+        const currency = stock.currency || 'USD';
+
+        // Calculate holding value based on currency
+        let valueDKK = 0;
+        let priceDisplay = '';
+        if (currency === 'DKK') {{
+          valueDKK = price * shares;  // Already in DKK
+          priceDisplay = `kr ${{price.toFixed(2)}}`;
+        }} else {{
+          valueDKK = price * shares * USDK_RATE;  // Convert USD to DKK
+          priceDisplay = `$$${{price.toFixed(2)}}`;
+        }}
+
         const change = stock.change_day || 0;
         const changeClass = change >= 0 ? 'positive' : 'negative';
 
         return `<tr>
           <td><strong>${{stock.name}}</strong></td>
           <td>${{shares}}</td>
-          <td>$${{price.toFixed(2)}}</td>
+          <td>${{priceDisplay}}</td>
           <td>kr ${{valueDKK.toLocaleString('da-DK', {{maximumFractionDigits: 0}})}}</td>
           <td class="${{changeClass}}">${{change >= 0 ? '▲' : '▼'}} ${{Math.abs(change).toFixed(2)}}%</td>
         </tr>`;
