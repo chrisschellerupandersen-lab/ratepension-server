@@ -480,3 +480,4 @@ if __name__ == "__main__":
     print(f"📱 Dashboard kalder: http://localhost:{port}/api/portfolio\n")
 
     app.run(debug=False, port=port, host=host)
+# Force rebuild
