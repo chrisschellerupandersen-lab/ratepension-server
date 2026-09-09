@@ -483,6 +483,613 @@ def get_dividend_forecast():
     }
     return jsonify(dividends)
 
+@app.route("/mega", methods=["GET", "POST"])
+def mega_dashboard():
+    """MEGA Dashboard med alle features - Live data + Analytics"""
+    DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "ratepension2026")
+
+    # Check login
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == DASHBOARD_PASSWORD:
+            return jsonify({"success": True, "token": "logged_in"})
+        else:
+            return jsonify({"success": False, "error": "Forkert password"}), 401
+
+    host = request.host
+
+    mega_html = """<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ratepension MEGA Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+    }
+
+    .container { max-width: 1600px; margin: 0 auto; }
+    .header { background: white; padding: 24px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 28px; font-weight: 700; }
+    .status { display: flex; gap: 12px; align-items: center; font-size: 13px; color: #64748b; }
+    .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: white;
+      border-bottom: 2px solid #e2e8f0;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 16px 24px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-weight: 500;
+      color: #64748b;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+    .tab-btn.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+    .tab-btn:hover {
+      color: #2563eb;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 32px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .kpi-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid #2563eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .kpi-label { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; font-weight: 600; }
+    .kpi-value { font-size: 24px; font-weight: 700; color: #0f172a; }
+    .kpi-change { font-size: 12px; color: #059669; margin-top: 4px; }
+    .kpi-change.negative { color: #dc2626; }
+
+    .controls {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input[type="range"] {
+      width: 300px;
+      cursor: pointer;
+    }
+    button {
+      padding: 10px 20px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover { background: #1d4ed8; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    .holdings-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .holdings-table th {
+      text-align: left;
+      padding: 12px;
+      background: #f1f5f9;
+      font-weight: 600;
+      font-size: 12px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .holdings-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .holdings-table tr:hover {
+      background: #f8fafc;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 400px;
+      margin-bottom: 32px;
+    }
+
+    .login-form { max-width: 400px; margin: 50px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .login-form h2 { margin-top: 0; text-align: center; }
+    .login-form input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 14px; }
+    .login-form button { width: 100%; }
+    .error { color: #dc2626; text-align: center; margin: 10px 0; }
+    #loginSection { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="loginSection" class="login-form">
+  <h2>🔒 MEGA Dashboard Login</h2>
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <input type="password" id="password" placeholder="Password" required autofocus>
+    <button type="submit">Login</button>
+    <div class="error" id="errorMsg"></div>
+  </form>
+</div>
+
+<div id="dashboard" style="display: none;">
+<div class="container">
+  <div class="header">
+    <h1>📊 Ratepension MEGA Dashboard</h1>
+    <div class="status">
+      <div class="status-dot"></div>
+      <span id="lastUpdate">Henter data...</span>
+      <button onclick="logout()" style="margin-left: 20px; padding: 8px 16px; font-size: 12px;">🚪 Logout</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab(event, 'overview')">📈 Oversigt</button>
+    <button class="tab-btn" onclick="switchTab(event, 'holdings')">📋 Beholdninger</button>
+    <button class="tab-btn" onclick="switchTab(event, 'performance')">📊 Udvikling</button>
+    <button class="tab-btn" onclick="switchTab(event, 'transactions')">💰 Transaktioner</button>
+    <button class="tab-btn" onclick="switchTab(event, 'benchmark')">🏆 Benchmark</button>
+    <button class="tab-btn" onclick="switchTab(event, 'settings')">⚙️ Indstillinger</button>
+  </div>
+
+  <div id="overview" class="tab-content active">
+    <div class="controls">
+      <div>
+        <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 8px;">Din Anskaffelsessum</label>
+        <input type="range" id="purchaseSlider" min="500000" max="3000000" step="50000" value="1200000">
+        <div style="font-size: 16px; font-weight: 700; color: #2563eb; margin-top: 8px;" id="purchaseValueDisplay">1.200.000 DKK</div>
+      </div>
+      <button onclick="setDefaultPurchase()">Nulstil</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Porteføljens Værdi</div>
+        <div class="kpi-value" id="currentValue">-</div>
+        <div class="kpi-change">LIVE Data</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Anskaffelsessum</div>
+        <div class="kpi-value" id="purchaseValueKPI">-</div>
+        <div class="kpi-change">Dit indskud</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Gevinst/Tab</div>
+        <div class="kpi-value" id="gainValue">-</div>
+        <div class="kpi-change" id="gainPercent">-</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">ROI %</div>
+        <div class="kpi-value" id="roi">-</div>
+        <div class="kpi-change">Return on Investment</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+      <div class="card">
+        <h3>Top 5 Aktier</h3>
+        <div id="topHoldings"></div>
+      </div>
+      <div class="card">
+        <h3>Anbefalinger</h3>
+        <div id="recommendations"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="holdings" class="tab-content">
+    <div class="card">
+      <h3>Alle Beholdninger (Live)</h3>
+      <table class="holdings-table">
+        <thead>
+          <tr>
+            <th>Aktie</th>
+            <th>Antal</th>
+            <th>Pris (Live)</th>
+            <th>Beholdning DKK</th>
+            <th>Dag %</th>
+          </tr>
+        </thead>
+        <tbody id="holdingsBody">
+          <tr><td colspan="5" style="text-align: center;">Henter data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="performance" class="tab-content">
+    <div class="card">
+      <h3>Portefølje Udvikling (Forecast)</h3>
+      <div id="performanceChart" class="chart-container"></div>
+    </div>
+  </div>
+
+  <div id="transactions" class="tab-content">
+    <div class="card">
+      <h3>Transaktion Historik</h3>
+      <table class="holdings-table">
+        <thead>
+          <tr>
+            <th>Dato</th>
+            <th>Aktie</th>
+            <th>Type</th>
+            <th>Antal</th>
+            <th>Pris</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="transactionsBody">
+          <tr><td colspan="6" style="text-align: center;">Henter data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="benchmark" class="tab-content">
+    <div class="card">
+      <h3>Sammenligning med Indeks</h3>
+      <div id="benchmarkChart" class="chart-container"></div>
+    </div>
+  </div>
+
+  <div id="settings" class="tab-content">
+    <div class="card">
+      <h3>Forventet Årligt Udbytte</h3>
+      <div id="dividendForecast"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  const API_URL = 'https://""" + host + """/api';
+  let portfolioData = null;
+  let chartInstances = {};
+
+  function checkLogin() {
+    const token = localStorage.getItem('dashboardToken');
+    if (token) {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      fetchData();
+    } else {
+      document.getElementById('loginSection').style.display = 'block';
+    }
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const password = document.getElementById('password').value;
+    const errorMsg = document.getElementById('errorMsg');
+
+    try {
+      const formData = new FormData();
+      formData.append('password', password);
+
+      const response = await fetch('/mega', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem('dashboardToken', 'logged_in');
+        errorMsg.textContent = '';
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        fetchData();
+      } else {
+        errorMsg.textContent = '❌ Forkert password!';
+        document.getElementById('password').value = '';
+      }
+    } catch (e) {
+      errorMsg.textContent = 'Fejl: ' + e.message;
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('dashboardToken');
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+  }
+
+  const purchaseSlider = document.getElementById('purchaseSlider');
+  purchaseSlider.addEventListener('input', () => {
+    document.getElementById('purchaseValueDisplay').textContent =
+      (parseInt(purchaseSlider.value) / 1000).toLocaleString('da-DK') + ' DKK';
+    updateKPIs();
+  });
+
+  function switchTab(evt, tabName) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabName).classList.add('active');
+    evt.currentTarget.classList.add('active');
+  }
+
+  async function fetchData() {
+    try {
+      const response = await fetch(API_URL + '/portfolio');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      portfolioData = await response.json();
+
+      document.getElementById('lastUpdate').textContent =
+        `✅ Live • ${new Date(portfolioData.last_update).toLocaleTimeString('da-DK')}`;
+
+      updateAllTabs();
+    } catch (error) {
+      console.error('Error:', error);
+      document.getElementById('lastUpdate').textContent = '❌ Forbindelsesfejl';
+    }
+  }
+
+  function updateAllTabs() {
+    updateKPIs();
+    updateHoldings();
+    updateTopHoldings();
+    updatePerformance();
+    updateTransactions();
+    updateBenchmark();
+    updateSettings();
+  }
+
+  function updateKPIs() {
+    if (!portfolioData) return;
+
+    const purchase = parseInt(purchaseSlider.value);
+    const current = portfolioData.summary.total_value_dkk;
+    const gain = current - purchase;
+    const gainPct = ((gain / purchase) * 100).toFixed(1);
+    const roi = ((current / purchase - 1) * 100).toFixed(1);
+    const color = gain >= 0 ? '#059669' : '#dc2626';
+    const sign = gain >= 0 ? '+' : '';
+
+    document.getElementById('currentValue').textContent = (current / 1000).toLocaleString('da-DK') + 'k DKK';
+    document.getElementById('purchaseValueKPI').textContent = (purchase / 1000).toLocaleString('da-DK') + 'k DKK';
+    document.getElementById('gainValue').textContent = sign + (gain / 1000).toLocaleString('da-DK') + 'k DKK';
+    document.getElementById('gainValue').style.color = color;
+    document.getElementById('gainPercent').textContent = sign + gainPct + '%';
+    document.getElementById('gainPercent').style.color = color;
+    document.getElementById('roi').textContent = roi + '%';
+    document.getElementById('roi').style.color = color;
+  }
+
+  function updateHoldings() {
+    if (!portfolioData) return;
+
+    const tbody = document.getElementById('holdingsBody');
+    let html = '';
+
+    portfolioData.portfolio.forEach(stock => {
+      const value = stock.currency === 'DKK' ? stock.price * stock.shares : stock.price * stock.shares * 6.8;
+      const dayChange = stock.change_day || 0;
+      const dayClass = dayChange >= 0 ? 'color: #059669;' : 'color: #dc2626;';
+
+      html += `
+        <tr>
+          <td><strong>${stock.name}</strong></td>
+          <td>${stock.shares}</td>
+          <td>${stock.currency === 'DKK' ? 'kr ' : '$'}${stock.price.toFixed(2)}</td>
+          <td>kr ${value.toLocaleString('da-DK', {maximumFractionDigits: 0})}</td>
+          <td style="${dayClass}">${dayChange >= 0 ? '▲' : '▼'} ${Math.abs(dayChange).toFixed(2)}%</td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+  }
+
+  function updateTopHoldings() {
+    if (!portfolioData) return;
+
+    const sorted = [...portfolioData.portfolio]
+      .sort((a, b) => (b.price * b.shares) - (a.price * a.shares))
+      .slice(0, 5);
+
+    let html = '';
+    sorted.forEach((stock, idx) => {
+      const value = stock.currency === 'DKK' ? stock.price * stock.shares : stock.price * stock.shares * 6.8;
+      html += `<div style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+        <strong>${idx + 1}. ${stock.name}</strong><br>
+        <small style="color: #64748b;">kr ${value.toLocaleString('da-DK', {maximumFractionDigits: 0})}</small>
+      </div>`;
+    });
+    document.getElementById('topHoldings').innerHTML = html;
+  }
+
+  function updatePerformance() {
+    const ctx = document.getElementById('performanceChart');
+    if (!ctx) return;
+
+    if (chartInstances.performance) chartInstances.performance.destroy();
+
+    chartInstances.performance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['2024', '2025', '2026', '2027', '2028', '2029', '2030'],
+        datasets: [{
+          label: 'Portefølje Værdi (Forecast)',
+          data: [1680000, 1795000, 1920000, 2053000, 2197000, 2352000, 2470000],
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true } }
+      }
+    });
+  }
+
+  async function updateTransactions() {
+    try {
+      const response = await fetch(API_URL + '/transactions');
+      const transactions = await response.json();
+
+      const tbody = document.getElementById('transactionsBody');
+      let html = '';
+
+      transactions.forEach(t => {
+        html += `
+          <tr>
+            <td>${t.date}</td>
+            <td>${t.ticker}</td>
+            <td>${t.type === 'buy' ? '🟢 Køb' : '🔴 Salg'}</td>
+            <td>${t.shares}</td>
+            <td>${t.price}</td>
+            <td>${t.total.toLocaleString('da-DK')}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  }
+
+  async function updateBenchmark() {
+    try {
+      const response = await fetch(API_URL + '/benchmark');
+      const benchmarks = await response.json();
+
+      const ctx = document.getElementById('benchmarkChart');
+      if (chartInstances.benchmark) chartInstances.benchmark.destroy();
+
+      chartInstances.benchmark = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Jan', 'Jun', 'Dec'],
+          datasets: [
+            {
+              label: 'Min Portefølje',
+              data: [1680000, 1750000, 1815000],
+              borderColor: '#2563eb',
+              tension: 0.4
+            },
+            {
+              label: 'OMXC20',
+              data: benchmarks.OMXC20.map(b => b.price * 600),
+              borderColor: '#10b981',
+              tension: 0.4
+            },
+            {
+              label: 'MSCI World',
+              data: benchmarks.MSCI_WORLD.map(b => b.price * 600),
+              borderColor: '#f59e0b',
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true } }
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching benchmark:', error);
+    }
+  }
+
+  async function updateSettings() {
+    try {
+      const response = await fetch(API_URL + '/dividend-forecast');
+      const dividends = await response.json();
+
+      let html = '';
+      for (const [ticker, data] of Object.entries(dividends)) {
+        html += `<div style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+          <strong>${ticker}</strong>: ${data.yield}% yield • kr ${data.annual.toLocaleString('da-DK')}/år
+        </div>`;
+      }
+
+      document.getElementById('dividendForecast').innerHTML = html;
+
+      // Recommendations
+      document.getElementById('recommendations').innerHTML = `
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+          <strong>1. Lukk derivater</strong> - BULL NOVO og BULL NFLX er i tab
+        </div>
+        <div style="background: #dbeafe; border-left: 4px solid #2563eb; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+          <strong>2. Reducér Tech</strong> - Fra 50% til 40%
+        </div>
+        <div style="background: #dcfce7; border-left: 4px solid #059669; padding: 12px; border-radius: 6px;">
+          <strong>3. Tilføj obligationer</strong> - 15% for mindre risiko
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  }
+
+  function setDefaultPurchase() {
+    document.getElementById('purchaseSlider').value = '1200000';
+    document.getElementById('purchaseValueDisplay').textContent = '1.200.000 DKK';
+    updateKPIs();
+  }
+
+  window.addEventListener('load', () => {
+    checkLogin();
+    setInterval(fetchData, 300000);
+  });
+</script>
+
+</body>
+</html>"""
+
+    return render_template_string(mega_html)
+
 @app.route("/", methods=["GET"])
 def index():
     """Info side"""
@@ -500,7 +1107,8 @@ def index():
             "GET /api/benchmark": "Benchmark sammenligning",
             "GET /api/dividend-forecast": "Forventet udbytte",
             "POST /api/refresh": "Manuelt opdater nu",
-            "GET /health": "Server status"
+            "GET /health": "Server status",
+            "GET /mega": "MEGA Dashboard med alle features"
         },
         "last_update": cache["last_update"],
         "update_interval_seconds": cache["update_interval"]
