@@ -56,28 +56,31 @@ cache = {
 }
 
 def get_stock_data(ticker):
-    """Henter data fra Yahoo Finance via yfinance (offline fallback med live via web scrape)"""
+    """Henter live data fra Alpha Vantage API"""
     try:
-        # Prøv at hente via en public web API der ikke kræver API key
-        import urllib.parse
+        # Alpha Vantage API - gratis med API key
+        api_key = os.environ.get("ALPHAVANTAGE_API_KEY", "8I8LJTU3B6WG0BZM")
+        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={api_key}"
 
-        # Brug Coingecko-agtig approach: prøv en åben kurs-API
-        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
-
-        print(f"[DEBUG] Fetching {ticker} from Yahoo via query API")
+        print(f"[DEBUG] Fetching {ticker} from Alpha Vantage")
         response = requests.get(url, timeout=10)
         print(f"[DEBUG] Status for {ticker}: {response.status_code}")
 
         if response.status_code == 200:
             data = response.json()
+            quote = data.get("Global Quote", {})
 
-            if "quoteResponse" in data and data["quoteResponse"]["result"]:
-                quote = data["quoteResponse"]["result"][0]
-                current_price = quote.get("regularMarketPrice", 0)
-                change_pct = quote.get("regularMarketChangePercent", 0)
+            if quote:
+                current_price = float(quote.get("05. price", 0))
+                change_pct = quote.get("10. change percent", "0%").replace("%", "").strip()
+
+                try:
+                    change_pct = float(change_pct)
+                except:
+                    change_pct = 0.0
 
                 if current_price > 0:
-                    print(f"[SUCCESS] Got live data for {ticker}: ${current_price}")
+                    print(f"[SUCCESS] Got LIVE data for {ticker}: ${current_price}")
                     return {
                         "ticker": ticker,
                         "price": round(current_price, 2),
@@ -87,13 +90,13 @@ def get_stock_data(ticker):
                         "market_cap": 0,
                         "pe_ratio": 0,
                         "dividend_yield": 0,
-                        "source": "Yahoo Finance"
+                        "source": "Alpha Vantage"
                     }
 
-        raise Exception(f"No valid price data")
+        raise Exception(f"No valid price data from Alpha Vantage")
 
     except Exception as e:
-        print(f"[WARNING] Live fetch failed for {ticker}: {str(e)}")
+        print(f"[WARNING] Alpha Vantage failed for {ticker}: {str(e)}")
         # Fallback: mock data
         mock_prices = {
             "MSFT": 418.65, "TSLA": 252.45, "NVDA": 128.95, "GOOGL": 178.50,
