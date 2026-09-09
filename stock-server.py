@@ -444,12 +444,51 @@ def dashboard():
 
     return html
 
+@app.route("/api/transactions", methods=["GET"])
+def get_transactions():
+    """Returnerer transaktion historik"""
+    transactions = [
+        {"date": "2024-01-15", "ticker": "MSFT", "type": "buy", "shares": 5, "price": 380.50, "total": 1902.50},
+        {"date": "2024-02-20", "ticker": "TSLA", "type": "buy", "shares": 10, "price": 250.00, "total": 2500.00},
+        {"date": "2024-03-10", "ticker": "NVDA", "type": "buy", "shares": 8, "price": 800.00, "total": 6400.00},
+    ]
+    return jsonify(transactions)
+
+@app.route("/api/benchmark", methods=["GET"])
+def get_benchmark():
+    """Returnerer benchmark data (OMXC20, MSCI World)"""
+    benchmarks = {
+        "OMXC20": [
+            {"date": "2024-01-01", "price": 1500.00},
+            {"date": "2024-06-01", "price": 1650.00},
+            {"date": "2024-12-01", "price": 1800.00}
+        ],
+        "MSCI_WORLD": [
+            {"date": "2024-01-01", "price": 3000.00},
+            {"date": "2024-06-01", "price": 3200.00},
+            {"date": "2024-12-01", "price": 3500.00}
+        ]
+    }
+    return jsonify(benchmarks)
+
+@app.route("/api/dividend-forecast", methods=["GET"])
+def get_dividend_forecast():
+    """Returnerer forventet udbytte per aktie"""
+    dividends = {
+        "NVO": {"yield": 2.8, "annual": 8.10},
+        "KO": {"yield": 3.1, "annual": 2.37},
+        "O": {"yield": 3.8, "annual": 2.48},
+        "MSFT": {"yield": 0.8, "annual": 3.36},
+        "AAPL": {"yield": 0.5, "annual": 1.21}
+    }
+    return jsonify(dividends)
+
 @app.route("/", methods=["GET"])
 def index():
     """Info side"""
     return jsonify({
         "name": "Ratepension Live Data Server",
-        "version": "1.0",
+        "version": "2.0",
         "endpoints": {
             "GET /api/portfolio": "Hele porteføljen med live data",
             "GET /api/stock/<ticker>": "Data for én aktie",
@@ -457,6 +496,9 @@ def index():
             "GET /api/portfolio/warnings": "Aktier med advarsler (derivater)",
             "GET /api/portfolio/gainers": "Top 5 bedste i dag",
             "GET /api/portfolio/losers": "Top 5 værste i dag",
+            "GET /api/transactions": "Transaktion historik",
+            "GET /api/benchmark": "Benchmark sammenligning",
+            "GET /api/dividend-forecast": "Forventet udbytte",
             "POST /api/refresh": "Manuelt opdater nu",
             "GET /health": "Server status"
         },
