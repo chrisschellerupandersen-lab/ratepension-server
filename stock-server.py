@@ -237,10 +237,9 @@ def health():
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     """Ratepension Dashboard"""
-    # Get the current host from request or use Railway URL
+    # Always use HTTPS for API (required for browser security)
     host = request.host
-    protocol = "https" if request.host_url.startswith("https") else "http"
-    api_url = f"{protocol}://{host}/api/portfolio"
+    api_url = f"https://{host}/api/portfolio"
 
     html = f"""<!DOCTYPE html>
 <html lang="da">
