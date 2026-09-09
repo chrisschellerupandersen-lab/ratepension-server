@@ -98,27 +98,47 @@ def get_stock_data(ticker):
 
     except Exception as e:
         print(f"[ERROR] Alpha Vantage failed for {ticker}: {str(e)}")
-        print(f"[ERROR] URL was: {url}")
-        # Re-raise so we know what's wrong
+        # Don't crash - let update_cache handle fallback
         raise
 
 def update_cache():
     """Opdater cache med live data"""
-    print(f"[{datetime.now()}] Henter live data fra Yahoo Finance...")
+    print(f"[{datetime.now()}] Henter live data fra Alpha Vantage...")
 
     stocks_data = []
+    failed_tickers = []
+
     for stock in PORTFOLIO:
         ticker = stock["ticker"]
-        data = get_stock_data(ticker)
-        data["name"] = stock["name"]
-        data["shares"] = stock["shares"]
-        if stock.get("warning"):
-            data["warning"] = True
-        stocks_data.append(data)
+        try:
+            data = get_stock_data(ticker)
+            data["name"] = stock["name"]
+            data["shares"] = stock["shares"]
+            if stock.get("warning"):
+                data["warning"] = True
+            stocks_data.append(data)
+        except Exception as e:
+            print(f"[WARNING] Skipping {ticker} due to API error: {e}")
+            failed_tickers.append(ticker)
+            # Fallback: use mock data for this stock
+            stocks_data.append({
+                "ticker": ticker,
+                "name": stock["name"],
+                "price": 100.0,  # Placeholder
+                "currency": "USD",
+                "change_day": 0.0,
+                "change_year": 0.0,
+                "market_cap": 0,
+                "pe_ratio": 0,
+                "dividend_yield": 0,
+                "source": "Mock (fallback)",
+                "shares": stock["shares"],
+                "warning": stock.get("warning", False)
+            })
 
     cache["stocks"] = stocks_data
     cache["last_update"] = datetime.now().isoformat()
-    print(f"[{datetime.now()}] Data opdateret succesfuldt! ({len(stocks_data)} aktier)")
+    print(f"[{datetime.now()}] Data opdateret! ({len(stocks_data)} aktier, {len(failed_tickers)} fejlede)")
 
 def background_updater():
     """Opdater data i baggrund hver 5 minutter"""
