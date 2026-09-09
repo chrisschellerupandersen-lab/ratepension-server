@@ -234,9 +234,21 @@ def health():
         "stocks_cached": len(cache["stocks"])
     })
 
-@app.route("/dashboard", methods=["GET"])
+@app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
-    """Ratepension Dashboard"""
+    """Ratepension Dashboard with Login"""
+    # Simple credentials - change these!
+    DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "ratepension2026")
+
+    # Check if user is logged in via POST
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == DASHBOARD_PASSWORD:
+            # Return success response
+            return jsonify({"success": True, "token": "logged_in"})
+        else:
+            return jsonify({"success": False, "error": "Forkert password"}), 401
+
     # Always use HTTPS for API (required for browser security)
     host = request.host
     api_url = f"https://{host}/api/portfolio"
@@ -254,20 +266,39 @@ def dashboard():
     .table {{ width: 100%; border-collapse: collapse; font-size: 13px; }} .table th {{ text-align: left; padding: 10px; background: var(--light); font-weight: 600; border-bottom: 2px solid var(--border); }}
     .table td {{ padding: 10px; border-bottom: 1px solid var(--border); }} .positive {{ color: var(--success); }} .negative {{ color: var(--danger); }}
     button {{ padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; background: var(--primary); color: white; font-weight: 500; }}
+    .login-form {{ max-width: 400px; margin: 50px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+    .login-form h2 {{ margin-top: 0; text-align: center; }}
+    .login-form input {{ width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; }}
+    .login-form button {{ width: 100%; }}
+    .error {{ color: var(--danger); text-align: center; margin: 10px 0; }}
+    #dashboard {{ display: none; }}
   </style>
 </head>
 <body>
-<div class="container">
-  <h1>📊 Ratepension Dashboard</h1>
-  <div class="card">
-    <h3>Live Aktier fra Yahoo Finance</h3>
-    <button onclick="location.reload()">🔄 Opdater</button>
-    <table class="table">
-      <thead><tr><th>Aktie</th><th>Antal</th><th>Pris (USD)</th><th>Beholdning (DKK)</th><th>Dag %</th></tr></thead>
-      <tbody id="stockTable">
-        <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">📊 Henter data...</td></tr>
-      </tbody>
-    </table>
+<div id="loginSection" class="login-form">
+  <h2>🔒 Ratepension Dashboard</h2>
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <input type="password" id="password" placeholder="Password" required autofocus>
+    <button type="submit">Login</button>
+    <div class="error" id="errorMsg"></div>
+  </form>
+</div>
+
+<div id="dashboard" style="display: none;">
+  <div class="container">
+    <h1>📊 Ratepension Dashboard
+      <button style="float: right; padding: 5px 10px; font-size: 12px;" onclick="logout()">🚪 Logout</button>
+    </h1>
+    <div class="card">
+      <h3>Live Aktier fra Yahoo Finance</h3>
+      <button onclick="location.reload()">🔄 Opdater</button>
+      <table class="table">
+        <thead><tr><th>Aktie</th><th>Antal</th><th>Pris (USD)</th><th>Beholdning (DKK)</th><th>Dag %</th></tr></thead>
+        <tbody id="stockTable">
+          <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">📊 Henter data...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -275,25 +306,71 @@ def dashboard():
   const API_URL = "{api_url}";
   const USDK_RATE = 6.8;
 
-  console.log("API URL:", API_URL);
+  // Check if logged in
+  function checkLogin() {{
+    const token = localStorage.getItem('dashboardToken');
+    if (token) {{
+      showDashboard();
+      loadData();
+    }}
+  }}
+
+  async function handleLogin(e) {{
+    e.preventDefault();
+    const password = document.getElementById('password').value;
+    const errorMsg = document.getElementById('errorMsg');
+
+    try {{
+      const formData = new FormData();
+      formData.append('password', password);
+
+      const response = await fetch('/dashboard', {{
+        method: 'POST',
+        body: formData
+      }});
+
+      const data = await response.json();
+
+      if (data.success) {{
+        localStorage.setItem('dashboardToken', 'logged_in');
+        errorMsg.textContent = '';
+        showDashboard();
+        loadData();
+      }} else {{
+        errorMsg.textContent = '❌ Forkert password!';
+        document.getElementById('password').value = '';
+      }}
+    }} catch (e) {{
+      errorMsg.textContent = 'Fejl: ' + e.message;
+    }}
+  }}
+
+  function showDashboard() {{
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+  }}
+
+  function logout() {{
+    localStorage.removeItem('dashboardToken');
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+  }}
 
   async function loadData() {{
     try {{
-      console.log("Fetching from:", API_URL);
       const response = await fetch(API_URL, {{
         method: 'GET',
         headers: {{'Content-Type': 'application/json'}},
         mode: 'cors'
       }});
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {{
-        throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
+        throw new Error(`HTTP ${{response.status}}`);
       }}
 
       const data = await response.json();
-      console.log("Data received:", data.portfolio.length, "stocks");
 
       const tbody = document.getElementById('stockTable');
       const rows = data.portfolio.map(stock => {{
@@ -315,12 +392,14 @@ def dashboard():
       tbody.innerHTML = rows || '<tr><td colspan="5">Ingen data</td></tr>';
     }} catch (e) {{
       console.error("Fetch error:", e);
-      document.getElementById('stockTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: red;">Fejl: ${{e.message}}<br/>API: ${{API_URL}}</td></tr>`;
+      document.getElementById('stockTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: red;">Fejl: ${{e.message}}</td></tr>`;
     }}
   }}
 
-  window.addEventListener('load', loadData);
-  setInterval(loadData, 5 * 60 * 1000);
+  window.addEventListener('load', () => {{
+    checkLogin();
+    setInterval(loadData, 5 * 60 * 1000);
+  }});
 </script>
 </body>
 </html>"""
