@@ -57,9 +57,10 @@ cache = {
 
 def get_stock_data(ticker):
     """Henter live data fra Alpha Vantage API"""
+    # Alpha Vantage API key
+    api_key = "8I8LJTU3B6WG0BZM"
+
     try:
-        # Alpha Vantage API - gratis med API key
-        api_key = os.environ.get("ALPHAVANTAGE_API_KEY", "8I8LJTU3B6WG0BZM")
         url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={api_key}"
 
         print(f"[DEBUG] Fetching {ticker} from Alpha Vantage")
@@ -96,29 +97,10 @@ def get_stock_data(ticker):
         raise Exception(f"No valid price data from Alpha Vantage")
 
     except Exception as e:
-        print(f"[WARNING] Alpha Vantage failed for {ticker}: {str(e)}")
-        # Fallback: mock data
-        mock_prices = {
-            "MSFT": 418.65, "TSLA": 252.45, "NVDA": 128.95, "GOOGL": 178.50,
-            "NVO": 83.45, "KO": 74.30, "SBUX": 102.15, "META": 561.75,
-            "AAPL": 231.40, "COIN": 195.50, "V": 290.00, "O": 62.40,
-            "SAAB-B.ST": 145.00, "KTOS": 28.50, "SG": 185.30, "SPOT": 300.50,
-            "SOUN": 6.54, "SOFI": 28.30, "CYBN": 5.80, "EUNL.DE": 947.00
-        }
-
-        price = mock_prices.get(ticker, 100.0)
-
-        return {
-            "ticker": ticker,
-            "price": price,
-            "currency": "USD",
-            "change_day": 0.0,
-            "change_year": 0.0,
-            "market_cap": 0,
-            "pe_ratio": 0,
-            "dividend_yield": 0,
-            "source": "Mock (fallback)"
-        }
+        print(f"[ERROR] Alpha Vantage failed for {ticker}: {str(e)}")
+        print(f"[ERROR] URL was: {url}")
+        # Re-raise so we know what's wrong
+        raise
 
 def update_cache():
     """Opdater cache med live data"""
