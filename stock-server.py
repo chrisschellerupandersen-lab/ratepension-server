@@ -498,7 +498,7 @@ def mega_dashboard():
 
     host = request.host
 
-    mega_html = """<!DOCTYPE html>
+    mega_html_template = """<!DOCTYPE html>
 <html lang="da">
 <head>
   <meta charset="UTF-8">
@@ -785,7 +785,7 @@ def mega_dashboard():
 </div>
 
 <script>
-  const API_URL = 'https://""" + host + """/api';
+  const API_URL = 'https://{host}/api';
   let portfolioData = null;
   let chartInstances = {};
 
@@ -1088,6 +1088,7 @@ def mega_dashboard():
 </body>
 </html>"""
 
+    mega_html = mega_html_template.format(host=host)
     return render_template_string(mega_html)
 
 @app.route("/", methods=["GET"])
