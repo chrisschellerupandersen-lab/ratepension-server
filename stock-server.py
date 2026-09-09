@@ -276,10 +276,25 @@ def dashboard():
   const API_URL = "{api_url}";
   const USDK_RATE = 6.8;
 
+  console.log("API URL:", API_URL);
+
   async function loadData() {{
     try {{
-      const response = await fetch(API_URL);
+      console.log("Fetching from:", API_URL);
+      const response = await fetch(API_URL, {{
+        method: 'GET',
+        headers: {{'Content-Type': 'application/json'}},
+        mode: 'cors'
+      }});
+
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {{
+        throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
+      }}
+
       const data = await response.json();
+      console.log("Data received:", data.portfolio.length, "stocks");
 
       const tbody = document.getElementById('stockTable');
       const rows = data.portfolio.map(stock => {{
@@ -298,9 +313,10 @@ def dashboard():
         </tr>`;
       }}).join('');
 
-      tbody.innerHTML = rows;
+      tbody.innerHTML = rows || '<tr><td colspan="5">Ingen data</td></tr>';
     }} catch (e) {{
-      document.getElementById('stockTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: red;">Fejl: ${{e.message}}</td></tr>`;
+      console.error("Fetch error:", e);
+      document.getElementById('stockTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: red;">Fejl: ${{e.message}}<br/>API: ${{API_URL}}</td></tr>`;
     }}
   }}
 
