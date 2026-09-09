@@ -81,7 +81,7 @@ def get_stock_data(ticker):
         "SOUN": {"price": 7.25, "change": -2.15, "currency": "USD"},
         "SOFI": {"price": 30.45, "change": 1.55, "currency": "USD"},
         "CYBN": {"price": 6.35, "change": -1.25, "currency": "USD"},
-        "EUNL.DE": {"price": 982.30, "change": 0.85, "currency": "USD"},
+        "EUNL.DE": {"price": 146.9, "change": 0.85, "currency": "EUR"},
 
         # Danish stocks (DKK) - Nasdaq OMX Copenhagen
         "NVO": {"price": 288.9, "change": -0.85, "currency": "DKK"},
@@ -406,9 +406,14 @@ def dashboard():
         // Calculate holding value based on currency
         let valueDKK = 0;
         let priceDisplay = '';
+        const EUR_TO_DKK = 7.46;  // EUR/DKK rate
+
         if (currency === 'DKK') {{
           valueDKK = price * shares;  // Already in DKK
           priceDisplay = `kr ${{price.toFixed(2)}}`;
+        }} else if (currency === 'EUR') {{
+          valueDKK = price * shares * EUR_TO_DKK;  // Convert EUR to DKK
+          priceDisplay = `€${{price.toFixed(2)}}`;
         }} else {{
           valueDKK = price * shares * USDK_RATE;  // Convert USD to DKK
           priceDisplay = `$$${{price.toFixed(2)}}`;
