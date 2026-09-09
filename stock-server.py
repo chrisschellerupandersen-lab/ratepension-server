@@ -3,7 +3,7 @@ Ratepension Live Stock Data Server
 Henter live data fra Yahoo Finance og udstiller som REST API
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory, render_template_string
 from flask_cors import CORS
 import yfinance as yf
 import json
@@ -233,6 +233,81 @@ def health():
         "last_update": cache["last_update"],
         "stocks_cached": len(cache["stocks"])
     })
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    """Ratepension Dashboard"""
+    api_url = os.environ.get("DASHBOARD_API_URL", "http://localhost:5000/api/portfolio")
+
+    html = f"""<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ratepension Dashboard</title>
+  <style>
+    :root {{ --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --dark: #1f2937; --light: #f3f4f6; --border: #e5e7eb; }}
+    * {{ box-sizing: border-box; }} body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--light); color: var(--dark); padding: 20px; margin: 0; }}
+    .container {{ max-width: 1600px; margin: 0 auto; }} h1 {{ margin: 0 0 10px 0; font-size: 28px; }} .card {{ background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+    .table {{ width: 100%; border-collapse: collapse; font-size: 13px; }} .table th {{ text-align: left; padding: 10px; background: var(--light); font-weight: 600; border-bottom: 2px solid var(--border); }}
+    .table td {{ padding: 10px; border-bottom: 1px solid var(--border); }} .positive {{ color: var(--success); }} .negative {{ color: var(--danger); }}
+    button {{ padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; background: var(--primary); color: white; font-weight: 500; }}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Ratepension Dashboard</h1>
+  <div class="card">
+    <h3>Live Aktier fra Yahoo Finance</h3>
+    <button onclick="location.reload()">🔄 Opdater</button>
+    <table class="table">
+      <thead><tr><th>Aktie</th><th>Antal</th><th>Pris (USD)</th><th>Beholdning (DKK)</th><th>Dag %</th></tr></thead>
+      <tbody id="stockTable">
+        <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">📊 Henter data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const API_URL = "{api_url}";
+  const USDK_RATE = 6.8;
+
+  async function loadData() {{
+    try {{
+      const response = await fetch(API_URL);
+      const data = await response.json();
+
+      const tbody = document.getElementById('stockTable');
+      const rows = data.portfolio.map(stock => {{
+        const price = stock.price || 0;
+        const shares = stock.shares || 0;
+        const valueDKK = price * shares * USDK_RATE;
+        const change = stock.change_day || 0;
+        const changeClass = change >= 0 ? 'positive' : 'negative';
+
+        return `<tr>
+          <td><strong>${{stock.name}}</strong></td>
+          <td>${{shares}}</td>
+          <td>$${{price.toFixed(2)}}</td>
+          <td>kr ${{valueDKK.toLocaleString('da-DK', {{maximumFractionDigits: 0}})}}</td>
+          <td class="${{changeClass}}">${{change >= 0 ? '▲' : '▼'}} ${{Math.abs(change).toFixed(2)}}%</td>
+        </tr>`;
+      }}).join('');
+
+      tbody.innerHTML = rows;
+    }} catch (e) {{
+      document.getElementById('stockTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: red;">Fejl: ${{e.message}}</td></tr>`;
+    }}
+  }}
+
+  window.addEventListener('load', loadData);
+  setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>"""
+
+    return html
 
 @app.route("/", methods=["GET"])
 def index():
