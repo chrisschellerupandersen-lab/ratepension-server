@@ -3,7 +3,7 @@ Ratepension Live Stock Data Server
 Henter live data fra Yahoo Finance og udstiller som REST API
 """
 
-from flask import Flask, jsonify, request, send_from_directory, render_template_string
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import requests
 import json
@@ -1089,7 +1089,7 @@ def mega_dashboard():
 </html>"""
 
     mega_html = mega_html_template.format(host=host)
-    return render_template_string(mega_html)
+    return mega_html
 
 @app.route("/", methods=["GET"])
 def index():
