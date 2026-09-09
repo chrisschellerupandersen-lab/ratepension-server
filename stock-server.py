@@ -5,7 +5,7 @@ Henter live data fra Yahoo Finance og udstiller som REST API
 
 from flask import Flask, jsonify, request, send_from_directory, render_template_string
 from flask_cors import CORS
-import yfinance as yf
+import requests
 import json
 from datetime import datetime, timedelta
 import threading
