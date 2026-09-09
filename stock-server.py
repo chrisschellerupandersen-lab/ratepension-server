@@ -58,30 +58,38 @@ cache = {
 def get_stock_data(ticker):
     """Henter data fra Finnhub API (gratis, stabil)"""
     try:
-        # Finnhub gratis API - ingen key påkrævet for quote endpoint
+        # Finnhub gratis API
         url = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token=c91ad919e0ad89e2af097f3cf44c38306a0d4c71"
 
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        data = response.json()
+        print(f"[DEBUG] Fetching {ticker} from: {url}")
+        response = requests.get(url, timeout=10)
+        print(f"[DEBUG] Status {ticker}: {response.status_code}")
 
-        current_price = data.get("c", 0)  # current price
-        change_pct = data.get("d", 0)    # change in dollars
-        change_pct_day = data.get("dp", 0)  # change percent
+        if response.status_code == 200:
+            data = response.json()
+            print(f"[DEBUG] Data for {ticker}: {data}")
 
-        return {
-            "ticker": ticker,
-            "price": round(current_price, 2) if current_price else 0,
-            "currency": "USD",
-            "change_day": round(change_pct_day, 2) if change_pct_day else 0,
-            "change_year": 0.0,
-            "market_cap": 0,
-            "pe_ratio": 0,
-            "dividend_yield": 0,
-            "source": "Finnhub"
-        }
+            current_price = data.get("c", 0)  # current price
+            change_pct_day = data.get("dp", 0)  # change percent
+
+            if current_price > 0:
+                return {
+                    "ticker": ticker,
+                    "price": round(current_price, 2),
+                    "currency": "USD",
+                    "change_day": round(change_pct_day, 2),
+                    "change_year": 0.0,
+                    "market_cap": 0,
+                    "pe_ratio": 0,
+                    "dividend_yield": 0,
+                    "source": "Finnhub"
+                }
+
+        print(f"[DEBUG] No price data for {ticker}, using fallback")
+        raise Exception(f"No price data: {response.text}")
+
     except Exception as e:
-        print(f"Error fetching {ticker} from Finnhub: {str(e)}")
+        print(f"[ERROR] {ticker}: {str(e)}")
         # Fallback: mock data
         mock_prices = {
             "MSFT": 418.65, "TSLA": 252.45, "NVDA": 128.95, "GOOGL": 178.50,
