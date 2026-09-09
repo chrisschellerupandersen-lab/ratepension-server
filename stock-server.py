@@ -56,40 +56,44 @@ cache = {
 }
 
 def get_stock_data(ticker):
-    """Henter data fra Finnhub API (gratis, stabil)"""
+    """Henter data fra Yahoo Finance via yfinance (offline fallback med live via web scrape)"""
     try:
-        # Finnhub gratis API
-        url = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token=c91ad919e0ad89e2af097f3cf44c38306a0d4c71"
+        # Prøv at hente via en public web API der ikke kræver API key
+        import urllib.parse
 
-        print(f"[DEBUG] Fetching {ticker} from: {url}")
+        # Brug Coingecko-agtig approach: prøv en åben kurs-API
+        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
+
+        print(f"[DEBUG] Fetching {ticker} from Yahoo via query API")
         response = requests.get(url, timeout=10)
-        print(f"[DEBUG] Status {ticker}: {response.status_code}")
+        print(f"[DEBUG] Status for {ticker}: {response.status_code}")
 
         if response.status_code == 200:
             data = response.json()
-            print(f"[DEBUG] Data for {ticker}: {data}")
 
-            current_price = data.get("c", 0)  # current price
-            change_pct_day = data.get("dp", 0)  # change percent
+            if "quoteResponse" in data and data["quoteResponse"]["result"]:
+                quote = data["quoteResponse"]["result"][0]
+                current_price = quote.get("regularMarketPrice", 0)
+                change_pct = quote.get("regularMarketChangePercent", 0)
 
-            if current_price > 0:
-                return {
-                    "ticker": ticker,
-                    "price": round(current_price, 2),
-                    "currency": "USD",
-                    "change_day": round(change_pct_day, 2),
-                    "change_year": 0.0,
-                    "market_cap": 0,
-                    "pe_ratio": 0,
-                    "dividend_yield": 0,
-                    "source": "Finnhub"
-                }
+                if current_price > 0:
+                    print(f"[SUCCESS] Got live data for {ticker}: ${current_price}")
+                    return {
+                        "ticker": ticker,
+                        "price": round(current_price, 2),
+                        "currency": "USD",
+                        "change_day": round(change_pct, 2),
+                        "change_year": 0.0,
+                        "market_cap": 0,
+                        "pe_ratio": 0,
+                        "dividend_yield": 0,
+                        "source": "Yahoo Finance"
+                    }
 
-        print(f"[DEBUG] No price data for {ticker}, using fallback")
-        raise Exception(f"No price data: {response.text}")
+        raise Exception(f"No valid price data")
 
     except Exception as e:
-        print(f"[ERROR] {ticker}: {str(e)}")
+        print(f"[WARNING] Live fetch failed for {ticker}: {str(e)}")
         # Fallback: mock data
         mock_prices = {
             "MSFT": 418.65, "TSLA": 252.45, "NVDA": 128.95, "GOOGL": 178.50,
